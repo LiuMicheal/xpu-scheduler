@@ -1,0 +1,17 @@
+syntax='proto3';
+
+option go_package = ".;server";
+
+service GetUsedRate{
+    rpc GetUsedRate(Request) returns (Response) {}
+}
+
+message Request{
+    int32 Cycle = 1;
+}
+message Response{
+    uint32  Aicore_usage=1;
+    uint32  Aicpu_usage=2;
+    uint32  Ctrlcpu_usage=3;
+    uint32  Memory_usage=4;
+}

@@ -1,0 +1,15 @@
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+leaderElection:
+  leaderElect: false
+profiles:
+  - schedulerName: xpu-scheduler
+    plugins:
+      filter:
+        enabled:
+          - name: xpu-plugin
+      score:
+        enabled:
+          - name: xpu-plugin
+        disabled:
+          - name: "*"

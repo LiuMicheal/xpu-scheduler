@@ -1,0 +1,254 @@
+# 1. Create ClusterRole--xpu-scheduler-clusterrole
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: xpu-scheduler-clusterrole
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - endpoints
+      - events
+    verbs:
+      - create
+      - get
+      - update
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - delete
+      - get
+      - list
+      - watch
+      - update
+  - apiGroups:
+      - ""
+    resources:
+      - bindings
+      - pods/binding
+    verbs:
+      - create
+  - apiGroups:
+      - ""
+    resources:
+      - pods/status
+    verbs:
+      - patch
+      - update
+  - apiGroups:
+      - ""
+    resources:
+      - replicationcontrollers
+      - services
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - apps
+      - extensions
+    resources:
+      - replicasets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - apps
+    resources:
+      - statefulsets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - policy
+    resources:
+      - poddisruptionbudgets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - persistentvolumeclaims
+      - persistentvolumes
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - "storage.k8s.io"
+    resources:
+      - storageclasses
+      - csinodes
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - "coordination.k8s.io"
+    resources:
+      - leases
+    verbs:
+      - create
+      - get
+      - list
+      - update
+  - apiGroups:
+      - "events.k8s.io"
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+      - update
+---
+# 2. Create ServiceAccount--xpu-scheduler-sa
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: xpu-scheduler-sa
+  namespace: kube-system
+---
+# 3. Create ClusterRoleBinding--ServiceAccount binding ClusterRole named xpu-scheduler-clusterrole
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: xpu-scheduler-clusterrolebinding
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: xpu-scheduler-clusterrole
+subjects:
+  - kind: ServiceAccount
+    name: xpu-scheduler-sa
+    namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cluster-admin:xpu-scheduler
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: system:serviceaccount:kube-system:xpu-scheduler-sa
+---
+# 5. Create ConfigMap--scheduler-config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scheduler-config
+  namespace: kube-system
+data:
+  scheduler-config.yaml: |
+    apiVersion: kubescheduler.config.k8s.io/v1beta3
+    kind: KubeSchedulerConfiguration
+    leaderElection:
+      leaderElect: false
+    profiles:
+    - schedulerName: xpu-scheduler
+      plugins:
+        multiPoint:
+          enabled:
+          - name: xpu-plugin
+          # - name: NodeResourcesFit
+      #     disabled:
+      #     - name: '*'
+      #   # preBind:
+      #   #   enabled:
+      #   #   - name: xpu-plugin
+      #   #   disabled:
+      #   #   - name: '*'
+---
+# 5. Deploy custom plug-ins (Deployment method)
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: xpu-scheduler
+#   namespace: kube-system
+#   labels:
+#     component: xpu-scheduler
+# spec:
+#   replicas: 1
+#   selector:
+#     matchLabels:
+#       component: xpu-scheduler
+#   template:
+#     metadata:
+#       labels:
+#         component: xpu-scheduler
+#     spec:
+#       serviceAccount: xpu-scheduler-sa
+#       # To mark a Pod as critical, set the Pod's priorityClassName to system-cluster-critical or system-node-critical.
+#       # system-node-critical is the highest level of availability priority, even higher than system-cluster-critical.
+#       priorityClassName: system-cluster-critical
+#       volumes:
+#         - name: scheduler-config
+#           configMap:
+#             name: scheduler-config
+#       restartPolicy: Never
+#       containers:
+
+#         - name: xpu-scheduler
+#           image: localhost:5000/xpu-sched:v3
+#           imagePullPolicy: IfNotPresent
+#           args:
+#             - /usr/local/bin/xpu-scheduler
+#             - --config=/etc/kubernetes/scheduler-config.yaml
+#             - --v=3
+#           volumeMounts:
+#             - name: scheduler-config
+#               mountPath: /etc/kubernetes
+apiVersion: v1
+kind: Pod
+metadata:
+  name: xpu-scheduler
+  namespace: kube-system
+  labels:
+    component: xpu-scheduler
+spec:
+  serviceAccount: xpu-scheduler-sa
+  # To mark a Pod as critical, set the Pod's priorityClassName to system-cluster-critical or system-node-critical.
+  # system-node-critical is the highest level of availability priority, even higher than system-cluster-critical.
+  priorityClassName: system-cluster-critical
+  volumes:
+    - name: scheduler-config
+      configMap:
+        name: scheduler-config
+  restartPolicy: Never
+  containers:
+    - name: xpu-scheduler
+      image: localhost:5000/xpu-sched:v3
+      imagePullPolicy: IfNotPresent
+      args:
+        - /usr/local/bin/xpu-scheduler
+        - --config=/etc/kubernetes/scheduler-config.yaml
+        - --v=3
+      volumeMounts:
+        - name: scheduler-config
+          mountPath: /etc/kubernetes

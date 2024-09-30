@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-scheduler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-scheduler
+  template:
+    metadata:
+      labels:
+        app: test-scheduler
+    spec:
+      # Manually specify a schedulerName field and set it to the custom scheduler name xpu-scheduler above
+      schedulerName: xpu-scheduler
+      containers:
+        - image: docker.io/library/nginx:latest
+          imagePullPolicy: IfNotPresent
+          name: nginx
+          ports:
+            - containerPort: 80
+          resources:
+            # requests:
+            #   cpu: 1000m
+            #   memory: 2048Mi
+            limits:
+              nwpu/vnpu-aicore: 50
+              # cpu: 1000m
+              # memory: 2048Mi

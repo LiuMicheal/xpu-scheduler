@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ubuntu-pod
+spec:
+  containers:
+  schedulerName: xpu-scheduler
+    - name: ubuntu-container
+      image: ubuntu:18.04
+      command: ["sleep", "infinity"]
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 2048Mi
+        limits:
+          nwpu/vnpu-aicore: 50
+          nwpu/vnpu-aicpu: 50
+          nwpu/vnpu-mem: 100
